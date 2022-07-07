@@ -337,6 +337,10 @@ class Binary():
       # We don't need trailing zeroes
       return ret
 
+   def addr2line(self, addr_hex):
+      func_name = _bfd.addr2line(self._ptr, addr_hex)
+      return func_name
+
    def __repr__(self):
       return "Binary<'%s', '%s', %s>" % (self.fname, self.file_type, self.arch)
 

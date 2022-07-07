@@ -896,6 +896,156 @@ static PyObject *pybfd_disassemble_bytes(PyObject *self, PyObject *args)
    return result;
 }
 
+static asymbol **syms = NULL; /* Symbol table.  */
+static bfd_vma find_pc;
+static const char *filename;
+static const char *functionname;
+static unsigned int line;
+static unsigned int discriminator;
+static bool found;
+
+static void
+slurp_symtab (bfd *abfd)
+{
+    long storage;
+    long symcount;
+    bool dynamic = false;
+
+    if ((bfd_get_file_flags (abfd) & HAS_SYMS) == 0) {
+        return;
+    }
+
+    storage = bfd_get_symtab_upper_bound (abfd);
+    if (storage == 0) {
+        storage = bfd_get_dynamic_symtab_upper_bound (abfd);
+        dynamic = true;
+    }
+
+#if 0
+    if (storage < 0)
+        bfd_fatal (bfd_get_filename (abfd));
+#endif
+
+    syms = (asymbol **) xmalloc (storage);
+    if (dynamic)
+        symcount = bfd_canonicalize_dynamic_symtab (abfd, syms);
+    else
+        symcount = bfd_canonicalize_symtab (abfd, syms);
+
+#if 0
+    if (symcount < 0)
+        bfd_fatal (bfd_get_filename (abfd));
+#endif
+
+    /* If there are no symbols left after canonicalization and
+       we have not tried the dynamic symbols then give them a go.  */
+    if (symcount == 0
+        && ! dynamic
+        && (storage = bfd_get_dynamic_symtab_upper_bound (abfd)) > 0) {
+
+        free (syms);
+        syms = xmalloc (storage);
+        symcount = bfd_canonicalize_dynamic_symtab (abfd, syms);
+    }
+
+    /* PR 17512: file: 2a1d3b5b.
+       Do not pretend that we have some symbols when we don't.  */
+    if (symcount <= 0) {
+        free (syms);
+        syms = NULL;
+    }
+}
+
+find_address_in_section (bfd *abfd, asection *section,
+			 void *data ATTRIBUTE_UNUSED)
+{
+    bfd_vma vma;
+    bfd_size_type size;
+
+    if (found)
+        return;
+
+    if ((bfd_section_flags (section) & SEC_ALLOC) == 0)
+        return;
+
+    vma = bfd_section_vma (section);
+    if (find_pc < vma)
+        return;
+
+    size = bfd_section_size (section);
+    if (find_pc >= vma + size)
+        return;
+
+    found = bfd_find_nearest_line_discriminator (abfd, section, syms, find_pc - vma,
+                                                 &filename, &functionname,
+                                                 &line, &discriminator);
+}
+
+static PyObject *pybfd_addr2line(PyObject *self, PyObject *args)
+{
+    bfd *abfd;
+    char* addr_hex;
+
+    if (PyArg_ParseTuple(args, "O&s", extract_bfd_capsule, &abfd, &addr_hex)) {
+        const char *name = NULL;
+        char *alloc = NULL;
+        asection *section;
+
+        /* Decompress sections.  */
+        abfd->flags |= BFD_DECOMPRESS;
+
+        if (bfd_check_format (abfd, bfd_archive)) {
+            fprintf(stderr, "cannot get addresses from archive\n");
+            goto end;
+        }
+
+        char **matching;
+
+        if (! bfd_check_format_matches (abfd, bfd_object, &matching)) {
+            bfd_get_filename (abfd);
+            if (bfd_get_error () == bfd_error_file_ambiguously_recognized) {
+                //list_matching_formats (matching);
+                free (matching);
+            }
+            goto end;
+        }
+
+        section = NULL;
+
+        if (syms == NULL) {
+            slurp_symtab (abfd);
+        }
+
+        find_pc = bfd_scan_vma (addr_hex, NULL, 16);
+
+        found = 0;
+        bfd_map_over_sections (abfd, find_address_in_section, NULL);
+        if (! found) {
+            //fprintf(stderr, "not find pc %s\n", addr_hex);
+            goto end;
+        } else {
+            const char *name;
+            char *alloc = NULL;
+
+            name = functionname;
+            if (name == NULL || *name == '\0') {
+                name = "??";
+            }
+
+            if (filename == NULL || *name == '\0') {
+                filename = "??";
+            }
+
+            return Py_BuildValue("(ssi)", name, filename, line);
+        }
+    } else {
+        PyErr_SetString(PyExc_TypeError, "Invalid parameter(s)");
+    }
+
+end:
+    return Py_BuildValue("()");
+}
+
 //
 // Define methods
 //
@@ -910,6 +1060,7 @@ static struct PyMethodDef BfdMethods[] = {
    declmethod(get_sections, "Get sections"),
    declmethod(get_architecture, "Get architecture information"),
    declmethod(disassemble_bytes, "Disassemble chunk of bytes"),
+   declmethod(addr2line, "Address to function name and line number"),
    {NULL},
 #undef declmethod
 };

@@ -233,7 +233,7 @@ long get_static_symbols(bfd *abfd, PyObject **py_symbol_list)
       DEBUG("SYM. %ld, %s @ 0x%x\n", x, symbol->name, symbol->value);
 
       // Get section this symbol is in
-      section = bfd_get_section(symbol);
+      section = bfd_asymbol_section(symbol);
 
       PyList_Append(*py_symbol_list,
          Py_BuildValue(
@@ -340,7 +340,7 @@ long get_dynamic_symbols(bfd *abfd, PyObject **py_symbol_list)
       DEBUG("SYM. %ld, %s @ 0x%x\n", x, symbol->name, symbol->value);
 
       // Get section this symbol is in
-      section = bfd_get_section(symbol);
+      section = bfd_asymbol_section(symbol);
 
       PyList_Append(*py_symbol_list,
          Py_BuildValue(
@@ -458,7 +458,7 @@ long get_synthetic_symbols(bfd *abfd, PyObject **py_symbol_list)
       DEBUG("SYM. %ld, %s @ 0x%x\n", x, symbol->name, symbol->value);
 
       // Get section this symbol is in
-      section = bfd_get_section(symbol);
+      section = bfd_asymbol_section(symbol);
 
       PyList_Append(*py_symbol_list,
          Py_BuildValue(
@@ -804,7 +804,7 @@ int disassemble_bytes(bfd *abfd, PyObject **py_instr_list, int arch_num, char *d
    new_abfd->xvec = xvec;
 
    // Use libopcodes to locate a suitable disassembler
-   disassembler_ftype disassemble_fn = disassembler(new_abfd);
+   disassembler_ftype disassemble_fn = disassembler(bfd_get_arch(new_abfd), bfd_big_endian(new_abfd), bfd_get_mach(new_abfd), new_abfd);
 
    if(!disassemble_fn)
    {
@@ -817,7 +817,7 @@ int disassemble_bytes(bfd *abfd, PyObject **py_instr_list, int arch_num, char *d
    disasm_info.flavour = bfd_get_flavour(new_abfd);
    disasm_info.arch = bfd_get_arch(new_abfd);
    disasm_info.mach = bfd_get_mach(new_abfd);
-   disasm_info.octets_per_byte = bfd_octets_per_byte(new_abfd);
+   disasm_info.octets_per_byte = bfd_octets_per_byte(new_abfd, NULL);
    disasm_info.skip_zeroes = DEFAULT_SKIP_ZEROES;
    disasm_info.skip_zeroes_at_end = DEFAULT_SKIP_ZEROES_AT_END;
    disasm_info.disassembler_needs_relocs = FALSE;

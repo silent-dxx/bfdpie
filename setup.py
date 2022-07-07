@@ -5,7 +5,7 @@ from setuptools import setup, Extension, Command
 from distutils.command import build as build_module
 from distutils.command.install import install
 
-BINUTILS_VERSION = "binutils-2.26"
+BINUTILS_VERSION = "binutils-2.38"
 
 module = Extension(
    name = "bfdpie._bfdpie",

@@ -191,6 +191,8 @@ class Binary():
       else:
          self.fname = fname
 
+      self._openr()
+
       self._get_architecture()
 
       # Extract all the various symbols, ignore errors
@@ -219,9 +221,7 @@ class Binary():
       """
          Fetch various information about the architecture.
       """
-      self._openr()
       ret = _bfd.get_architecture(self._ptr)
-      self._close()
 
       self.arch = None
       
@@ -253,45 +253,35 @@ class Binary():
       return _bfd.close(self._ptr)
 
    def _get_relocs(self):
-      self._openr()
       relocs = _bfd.get_relocs(self._ptr)
-      self._close()
 
       for reloc in relocs:
          s = Reloc(reloc[0], reloc[1], reloc[2], reloc[3])
          self.relocs[s.name] = s
 
    def _get_synthetic_symbols(self):
-      self._openr()
       synthetics = _bfd.get_synthetic_symbols(self._ptr)
-      self._close()
 
       for synthetic in synthetics:
          s = Synthetic(synthetic[0], synthetic[1], synthetic[2], synthetic[3])
          self.synthetic_symbols[s.name] = s
 
    def _get_static_symbols(self):
-      self._openr()
       symbols =  _bfd.get_static_symbols(self._ptr)
-      self._close()
 
       for symbol in symbols:
          s = Symbol(symbol[0], symbol[1], symbol[2], symbol[3])
          self.static_symbols[s.name] = s
 
    def _get_dynamic_symbols(self):
-      self._openr()
       symbols =  _bfd.get_dynamic_symbols(self._ptr)
-      self._close()
 
       for symbol in symbols:
          s = Symbol(symbol[0], symbol[1], symbol[2], symbol[3])
          self.dynamic_symbols[s.name] = s
 
    def _get_sections(self):
-      self._openr()
       sections = _bfd.get_sections(self._ptr)
-      self._close()
 
       # Split the return list into Section objects
       for s in sections:
@@ -302,10 +292,8 @@ class Binary():
       if not arch:
          arch = self.arch
 
-      self._openr()
       arch_id = archs.index(arch)
       ops = _bfd.disassemble_bytes(self._ptr, arch_id, data, vma)
-      self._close()
 
       ret = []
 
